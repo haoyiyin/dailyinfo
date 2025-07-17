@@ -41,21 +41,32 @@ class DailyScheduler:
         try:
             # 清除现有任务
             schedule.clear()
-            
+
+            # 计算下次运行时间（基于指定时区）
+            now_in_timezone = datetime.now(self.timezone)
+            today_run_time = self._get_today_run_time()
+
+            # 如果今天的运行时间已过，安排明天运行
+            if now_in_timezone.time() > today_run_time.time():
+                next_run_time = today_run_time + timedelta(days=1)
+            else:
+                next_run_time = today_run_time
+
             # 安排每日任务
             schedule.every().day.at(self.daily_run_time).do(self._run_task_with_timezone, task_func)
-            
+
             self.logger.info(f"✅ 已安排每日任务: {self.daily_run_time} ({self.timezone_str})")
-            
-            # 显示下次运行时间
-            next_run = schedule.next_run()
-            if next_run:
-                local_time = next_run.astimezone(self.timezone)
-                self.logger.info(f"📅 下次运行时间: {local_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-            
+            self.logger.info(f"📅 下次运行时间: {next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+
         except Exception as e:
             self.logger.error(f"❌ 安排定时任务失败: {e}")
             raise
+
+    def _get_today_run_time(self) -> datetime:
+        """获取今天的运行时间（基于指定时区）"""
+        now_in_timezone = datetime.now(self.timezone)
+        hour, minute = map(int, self.daily_run_time.split(':'))
+        return now_in_timezone.replace(hour=hour, minute=minute, second=0, microsecond=0)
     
     def _run_task_with_timezone(self, task_func: Callable):
         """在指定时区运行任务"""
@@ -127,11 +138,16 @@ class DailyScheduler:
             raise
     
     def get_next_run_time(self) -> Optional[datetime]:
-        """获取下次运行时间"""
-        next_run = schedule.next_run()
-        if next_run:
-            return next_run.astimezone(self.timezone)
-        return None
+        """获取下次运行时间（基于指定时区）"""
+        # 计算下次运行时间
+        now_in_timezone = datetime.now(self.timezone)
+        today_run_time = self._get_today_run_time()
+
+        # 如果今天的运行时间已过，返回明天的运行时间
+        if now_in_timezone.time() > today_run_time.time():
+            return today_run_time + timedelta(days=1)
+        else:
+            return today_run_time
     
     def get_status(self) -> dict:
         """获取调度器状态"""

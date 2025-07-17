@@ -1,0 +1,32 @@
+[Unit]
+Description=DailyInfo - AI-powered intelligent news monitoring system
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=your_username
+Group=your_group
+WorkingDirectory=/path/to/DailyInfo
+Environment=PATH=/usr/bin:/usr/local/bin
+Environment=PYTHONPATH=/path/to/DailyInfo
+ExecStart=/usr/bin/python3 /path/to/DailyInfo/main.py schedule
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# 资源限制
+LimitNOFILE=65536
+MemoryMax=1G
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/path/to/DailyInfo/logs
+
+[Install]
+WantedBy=multi-user.target

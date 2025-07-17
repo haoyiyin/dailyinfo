@@ -189,6 +189,82 @@ dailyinfo/
     └── zyte_client.py        # Zyte Client
 ```
 
+## 🚀 Production Deployment
+
+### Method 1: Integrated Commands (Recommended)
+
+```bash
+# Start background service
+python main.py start
+
+# Check service status
+python main.py daemon status
+
+# Stop service
+python main.py stop
+
+# Restart service
+python main.py daemon restart
+
+# View real-time logs
+tail -f logs/daemon.log
+```
+
+### Method 2: Systemd Service (Linux Servers)
+
+```bash
+# 1. Edit service file
+sudo cp dailyinfo.service /etc/systemd/system/
+sudo nano /etc/systemd/system/dailyinfo.service
+# Modify paths and user information
+
+# 2. Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable dailyinfo
+sudo systemctl start dailyinfo
+
+# 3. Check service status
+sudo systemctl status dailyinfo
+
+# 4. View logs
+sudo journalctl -u dailyinfo -f
+```
+
+### Method 3: Screen/Tmux
+
+```bash
+# Using screen
+screen -S dailyinfo
+python main.py schedule
+# Press Ctrl+A, D to detach
+
+# Reconnect
+screen -r dailyinfo
+
+# Using tmux
+tmux new-session -d -s dailyinfo 'python main.py schedule'
+tmux attach-session -t dailyinfo
+
+# Alternative: Use built-in daemon mode
+python main.py schedule --daemon
+```
+
+### Monitoring and Debugging
+
+```bash
+# Check system status
+python main.py status
+
+# Run immediate test
+python main.py run
+
+# View running logs
+tail -f logs/dailyinfo_*.log
+
+# View sent messages
+cat logs/sent_messages.json
+```
+
 ## 🤝 Contributing
 
 1. Fork the repository
