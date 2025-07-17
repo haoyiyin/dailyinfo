@@ -1,0 +1,200 @@
+# DailyInfo AI-Powered News Monitoring System Configuration Template
+# Copy this file to config.yaml and fill in your actual configuration
+
+# ================================
+# Basic Runtime Settings
+# ================================
+daily_run_time: "06:00"        # Daily execution time (24-hour format)
+timezone: "Asia/Shanghai"       # Timezone setting
+max_send_limit: 10              # Maximum push count
+time_window_hours: 24          # News time window (hours) - unified time parameter
+
+# ================================
+# API Service Configuration
+# ================================
+# AI Analysis APIs
+# AI preference configuration (sorted by priority)
+ai_preference: ["gemini", "openrouter"]  # First is primary, second is backup
+
+# Gemini configuration (supports multiple API random calls)
+gemini_api_keys:
+  - "YOUR_GEMINI_API_KEY_1_HERE"
+  - "YOUR_GEMINI_API_KEY_2_HERE"
+  - "YOUR_GEMINI_API_KEY_3_HERE"
+gemini_model: "gemini-2.5-flash"
+gemini_enable_search: true  # Whether to enable internet search
+
+# OpenRouter configuration (supports multiple API random calls)
+openrouter_api_keys:
+  - "YOUR_OPENROUTER_API_KEY_1_HERE"
+  - "YOUR_OPENROUTER_API_KEY_2_HERE"
+  - "YOUR_OPENROUTER_API_KEY_3_HERE"
+openrouter_endpoint: "https://openrouter.ai/api/v1"
+openrouter_model: "deepseek/deepseek-r1-0528:free"
+openrouter_enable_search: false  # Whether to enable internet search
+
+# Content extraction services
+firecrawl_api_key: "YOUR_FIRECRAWL_API_KEY_HERE"
+zyte_api_key: "YOUR_ZYTE_API_KEY_HERE"
+
+# Push services
+webhook_url: "YOUR_FEISHU_WEBHOOK_URL_HERE"
+
+# ================================
+# AI Analysis Settings
+# ================================
+ai_settings:
+  min_relevance_score: 8        # Minimum relevance score (1-10)
+
+  # AI prompt configuration (modify according to your industry needs)
+  prompts:
+    # News evaluation prompt - modify according to your industry and company situation
+    evaluation_prompt: |
+      # Role Definition
+
+      You are a business analyst for a professional renewable energy company. Our company focuses on the research, development, production, and application of renewable energy technologies.
+
+      ## Company Overview
+
+      We are a professional renewable energy technology company, mainly engaged in the research and development and industrialization of renewable energy technologies such as solar energy, wind energy, and energy storage. Our business model is B2B, providing renewable energy solutions for energy companies, manufacturing enterprises, and government institutions worldwide.
+
+      **Core Advantages**: Strong technical R&D capabilities, complete industrial chain layout, and rich project implementation experience.
+
+      ## Our Business Areas
+
+      We focus on the following renewable energy technology fields:
+
+      - **Solar Technology**: Photovoltaic power generation, solar cells, solar thermal power generation
+      - **Wind Energy Technology**: Wind power generation, offshore wind power, wind power equipment
+      - **Energy Storage Technology**: Lithium batteries, hydrogen energy storage, pumped storage
+      - **Smart Grid**: Microgrid, smart distribution, energy management systems
+      - **New Energy Vehicles**: Electric vehicles, charging facilities, power batteries
+      - **Green Hydrogen**: Electrolytic hydrogen production, hydrogen fuel cells, hydrogen applications
+
+      # Task
+
+      Your task is to analyze the given web content and evaluate its commercial value and reference significance for our company based on the following dimensions. You need to output a structured evaluation report without showing the reasoning process.
+
+      ## Evaluation Dimensions
+
+      1. **Technical Relevance**: Does the web content involve renewable energy technology fields we focus on? Does it contain technological breakthroughs, innovative applications, or industry development trends?
+
+      2. **Market Opportunities**: Does the web content reveal new market demands, policy support, or business opportunities? Does it help us identify potential partners or target customers?
+
+      3. **Policy and Regulations**: Does the web content involve policy changes, regulatory updates, or government support measures related to renewable energy?
+
+      4. **Competitive Intelligence**: Does the web content contain information about competitor movements, industry mergers and acquisitions, or major project information?
+
+      ## News Content to Analyze
+
+      **News Title**: {title}
+
+      **News Content**: {content}
+
+      **News Link**: {link}
+
+      Please provide your evaluation report strictly in the following JSON format:
+
+      {{
+        "is_relevant": true/false,
+        "relevance_score": 1-10,
+      }}
+
+      Return only JSON, no other text.
+
+    # Content optimization prompt - usually no need to modify
+    optimization_prompt: |
+      Role & Goal
+      You are a fully automated news processing engine. Your sole objective is to receive raw data, process it through a strict workflow, and ultimately output a standardized JSON object without showing the reasoning process. The entire process requires no human intervention.
+
+      1. 输入处理与异常 (Input & Exception Handling)
+      你将收到一份"待处理数据包"。首先，你必须对数据包进行分析和甄别。
+
+      1.1. 格式识别:
+      结构化数据: 如果数据包含明确的键（如title, content, original_link），则直接将其对应到内部变量。
+      非结构化数据:
+      如果数据仅为一个URL，则将其识别为 original_link。
+      如果数据为一段纯文本，则将其识别为 content。
+      如果数据是URL和文本的混合体，运用你的逻辑能力进行拆分和识别。
+
+      1.2. 异常处理 (Discard Rule):
+      识别条件: 如果"待处理数据包"满足以下任一条件，则判定为无效数据：
+      数据完全为空 (null, "")。
+      数据内容明确为爬虫抓取失败的标志，例如（不限于）："404 Not Found", "Error 403 Forbidden", "Access Denied", "找不到服务器", "请求超时"。
+      处理方式: 一旦判定为无效数据，必须立即中止所有后续步骤，并丢弃该数据包。不得输出任何内容。
+
+      2. 核心工作流 (Core Workflow)
+      如果数据有效，则严格按照以下流程处理：
+
+      2.1. 步骤一：链接溯源与验证 (Link Sourcing & Verification)
+      验证: 检查是否存在一个有效、可访问的 original_link。
+      溯源: 如果 original_link 缺失或无效，必须利用 title 和/或 content 的核心关键词，通过互联网搜索引擎，定位到最权威、最原始的新闻来源链接。此链接将成为本任务唯一的 original_link。这是所有后续步骤的基础。
+
+      2.2. 步骤二：内容获取与清洗 (Content Fetching & Cleaning)
+      获取: 访问已验证的 original_link，获取最完整、最原始的官方新闻全文。
+      清洗: 以官方新闻为准，彻底清除所有无关元素，包括但不限于：广告、相关文章推荐、版权声明、作者介绍、社交媒体分享按钮、评论区、cookie横幅、订阅请求等。确保留下的内容是纯粹的新闻主体。
+
+      2.3. 步骤三：内容优化与强制扩充 (Content Enhancement & Mandatory Expansion)
+      润色: 对清洗后的内容进行专业级润色，修正语法错误和错别字，使行文流畅、专业，符合标准新闻文体。
+      硬性指标检查: 计算当前 content 的总字符数。
+      强制扩充指令:
+      如果字符数 少于500个字符，你 必须无条件 启动内容扩充流程。这是一条 强制命令。
+      扩充方法: 必须基于 original_link 的原始报道，系统性地补充和丰富新闻内容，确保其包含完整的核心要素，如：
+      事件背景: 提供更深入的上下文信息。
+      关键细节: 补充具体数据、时间线、关键人物的直接引语等。
+      前因后果: 解释事件的起因及其可能产生的长短期影响。
+      多方视角: 引入不同利益相关方的观点或反应（若原文提及）。
+      循环验证: 扩充后，必须重新计算字符数。如果仍未达到500字符，则继续返回上一步进行补充，直至达标为止。
+
+      2.4. 步骤四：标题生成与翻译 (Title Generation & Translation)
+      标题定稿: 如果原始 title 缺失或质量不高，需根据最终完善的 content，生成一个高度概括、精准、且吸引人的中文新闻标题。
+      翻译: 将最终定稿的 title 和 content 精确、流畅地翻译为 简体中文。
+
+      3. 输出格式 (Output Formatting)
+      处理完成后，必须将结果封装在以下指定的JSON结构中。
+      最终输出必须且只能是这个JSON对象。
+      ABSOLUTELY NO additional text, explanation, comments, or any non-JSON characters before or after the JSON block. (例如，不允许出现 "这是您要的JSON：" 这样的文字)。
+
+      {{
+        "message_type": "text",
+        "title": "此处为翻译成中文的标题",
+        "content": "此处为经过清洗、润色、强制扩充并翻译成中文的新闻内容",
+        "original_link": "此处为核实后的原始新闻链接"
+      }}
+
+      待处理数据包:
+      **原始内容**: {raw_content}
+      **原始链接**: {original_link}
+
+# ================================
+# News Sources Configuration
+# ================================
+# RSS news sources (primary source)
+rss_feeds_file: "rss_feeds.yaml"
+
+# RSS processing settings
+rss_settings:
+  max_articles_per_feed: 10    # Maximum articles per RSS source
+  timeout: 30                  # Request timeout (seconds)
+  retry_count: 3               # Retry count on failure
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+
+# Unified news sources configuration
+news_sources:
+  # MediaStack news source
+  mediastack:
+    enabled: false               # Whether to enable MediaStack
+    api_key: "YOUR_MEDIASTACK_API_KEY_HERE"  # API key
+    category: "technology"       # News category (options: technology, business, health, etc.)
+    limit: 10                    # Number of news to fetch
+    timeout: 30                  # Request timeout (seconds)
+    retry_count: 3               # Retry count on failure
+
+  # News API news source
+  newsapi:
+    enabled: false               # Whether to enable News API
+    api_key: "YOUR_NEWS_API_KEY_HERE"  # API key
+    category: "technology"       # News category (options: technology, business, health, etc.)
+    limit: 10                    # Number of news to fetch
+    timeout: 30                  # Request timeout (seconds)
+    retry_count: 3               # Retry count on failure

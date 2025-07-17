@@ -1,0 +1,37 @@
+# RSS News Sources Configuration Template
+# Copy this file to rss_feeds.yaml and modify RSS sources as needed
+# All RSS parameters are passed from config.yaml
+
+rss_feeds:
+  # Renewable Energy Industry RSS Sources Example - Modify according to your industry needs
+
+  # Authoritative Institutions & Policy Regulations
+  - "https://www.energy.gov/rss/news.xml"
+  - "https://www.iea.org/rss/news"
+  - "https://www.irena.org/rss/news"
+
+  # Industry Media & Information
+  - "https://www.renewableenergyworld.com/feed/"
+  - "https://www.pv-magazine.com/feed/"
+  - "https://www.windpowerengineering.com/feed/"
+
+  # Technology & Innovation
+  - "https://spectrum.ieee.org/rss/energy"
+  - "https://www.greentechmedia.com/rss/all"
+  - "https://cleantechnica.com/feed/"
+
+  # Market & Investment
+  - "https://www.bloomberg.com/feeds/bna/clean-energy.rss"
+  - "https://www.reuters.com/business/energy/rss"
+
+  # Electric Vehicles & Energy Storage
+  - "https://electrek.co/feed/"
+  - "https://insideevs.com/feed/"
+
+  # Hydrogen & Fuel Cells
+  - "https://www.fuelcellsworks.com/feed/"
+  - "https://www.h2-view.com/feed/"
+
+  # Smart Grid & Energy Management
+  - "https://www.smart-energy.com/feed/"
+  - "https://www.utilitydive.com/feeds/news/"
