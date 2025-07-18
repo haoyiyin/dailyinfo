@@ -158,8 +158,29 @@ class AIContentAnalyzer:
 
             if result:
                 # 添加评估结果到新闻
+                score = result.get('relevance_score', 0.0)
+                is_relevant = result.get('is_relevant', False)
                 news.update(result)
                 evaluated_news.append(news)
+
+                # 详细的调试信息
+                title_preview = news.get('title', '')[:50]
+                content_preview = self._get_content_for_evaluation(news)[:100]
+                print(f"[INFO] 新闻 {i} 评估成功")
+                print(f"[DEBUG] 标题: {title_preview}...")
+                print(f"[DEBUG] 内容预览: {content_preview}...")
+                print(f"[DEBUG] 评分: {score}, 相关性: {is_relevant}")
+
+                # 如果评分异常高，额外警告
+                full_text = (news.get('title', '') + ' ' + self._get_content_for_evaluation(news)).lower()
+                plant_keywords = ['植物', '提取物', '保健品', '功能性', '活性成分', '膳食补充剂', '营养', '健康', 'fda', 'efsa']
+                has_relevant_keywords = any(keyword in full_text for keyword in plant_keywords)
+
+                if score >= 8 and not has_relevant_keywords:
+                    print(f"[WARN] ⚠️ 异常高分警告：非植物提取物相关新闻获得高分 {score}")
+                    print(f"[WARN] 请检查AI评估逻辑是否正确")
+                    print(f"[DEBUG] 全文关键词检查: {full_text[:200]}...")
+
             else:
                 print(f"[WARN] 新闻 {i} 所有AI评估都失败，跳过")
 
@@ -216,6 +237,28 @@ class AIContentAnalyzer:
         print(f"[ERROR] 所有AI内容优化都失败")
         return None
 
+    def _get_content_for_evaluation(self, news: Dict[str, Any]) -> str:
+        """获取用于AI评估的内容，按优先级选择可用字段"""
+        # 优先级：content > description > summary > 空字符串
+        content = news.get('content', '').strip()
+        if content:
+            print(f"[DEBUG] 使用content字段进行评估 (长度: {len(content)})")
+            return content
+
+        description = news.get('description', '').strip()
+        if description:
+            print(f"[DEBUG] 使用description字段进行评估 (长度: {len(description)})")
+            return description
+
+        summary = news.get('summary', '').strip()
+        if summary:
+            print(f"[DEBUG] 使用summary字段进行评估 (长度: {len(summary)})")
+            return summary
+
+        # 如果都没有内容，返回空字符串，让AI基于标题进行评估
+        print(f"[WARN] 没有可用内容，仅基于标题进行AI评估")
+        return ''
+
     def _evaluate_with_openrouter(self, news: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """使用OpenRouter评估新闻"""
         try:
@@ -225,11 +268,12 @@ class AIContentAnalyzer:
                 print("[ERROR] 没有可用的OpenRouter API密钥")
                 return None
 
-            # 构建评估提示词
+            # 构建评估提示词 - 使用可用的内容字段
+            content_for_evaluation = self._get_content_for_evaluation(news)
             prompt = self.evaluation_prompt.format(
                 title=news.get('title', ''),
-                content=news.get('content', ''),
-                link=news.get('link', '')
+                content=content_for_evaluation,
+                link=news.get('url', news.get('link', ''))
             )
 
             # 构建请求数据
@@ -285,11 +329,12 @@ class AIContentAnalyzer:
                 print("[ERROR] 没有可用的Gemini API密钥")
                 return None
 
-            # 构建评估提示词
+            # 构建评估提示词 - 使用可用的内容字段
+            content_for_evaluation = self._get_content_for_evaluation(news)
             prompt = self.evaluation_prompt.format(
                 title=news.get('title', ''),
-                content=news.get('content', ''),
-                link=news.get('link', '')
+                content=content_for_evaluation,
+                link=news.get('url', news.get('link', ''))
             )
 
             # 构建请求数据

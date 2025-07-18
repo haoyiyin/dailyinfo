@@ -280,6 +280,25 @@ class NewsProcessor:
     
     def fetch_full_content_batch(self, news_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """批量获取完整内容"""
+        # 检查爬虫开关
+        content_extraction_enabled = self.config.get('content_extraction', {}).get('enabled', True)
+
+        if not content_extraction_enabled:
+            print(f"[INFO] 步骤3：内容抓取已禁用，跳过FireCrawl+Zyte抓取，直接使用原始内容...")
+            processed_news = []
+            for i, news_item in enumerate(news_list, 1):
+                # 使用原始内容作为raw_content
+                fallback_content = (news_item.get('content', '') or
+                                  news_item.get('description', '') or
+                                  news_item.get('summary', ''))
+                news_item['raw_content'] = fallback_content
+                processed_news.append(news_item)
+                title = news_item.get('title', '')[:50]
+                print(f"[INFO] 新闻 {i}/{len(news_list)} 使用原始内容: {title}... (长度: {len(fallback_content)})")
+
+            print(f"[INFO] 原始内容处理完成，{len(processed_news)}/{len(news_list)} 条新闻处理完成")
+            return processed_news
+
         print(f"[INFO] 步骤3：使用FireCrawl+Zyte备用机制获取 {len(news_list)} 条最终新闻的完整内容...")
         processed_news = []
 
@@ -298,17 +317,23 @@ class NewsProcessor:
                     news_item['raw_content'] = full_content
                     print(f"[INFO] 新闻 {i} 内容抓取成功，内容长度: {len(full_content)} 字符")
                 else:
-                    # 内容抓取失败时，使用原始描述作为内容，不丢弃新闻
-                    news_item['raw_content'] = news_item.get('description', '') or news_item.get('content', '')
-                    print(f"[WARN] 新闻 {i} 内容抓取失败，使用原始描述作为内容")
+                    # 内容抓取失败时，按优先级使用原始内容
+                    fallback_content = (news_item.get('content', '') or
+                                      news_item.get('description', '') or
+                                      news_item.get('summary', ''))
+                    news_item['raw_content'] = fallback_content
+                    print(f"[WARN] 新闻 {i} 内容抓取失败，使用原始内容 (长度: {len(fallback_content)})")
 
                 processed_news.append(news_item)
 
             except Exception as e:
-                # 即使出错也不丢弃新闻，使用原始内容
-                news_item['raw_content'] = news_item.get('description', '') or news_item.get('content', '')
+                # 即使出错也不丢弃新闻，按优先级使用原始内容
+                fallback_content = (news_item.get('content', '') or
+                                  news_item.get('description', '') or
+                                  news_item.get('summary', ''))
+                news_item['raw_content'] = fallback_content
                 processed_news.append(news_item)
-                print(f"[ERROR] 新闻 {i} FireCrawl获取出错: {str(e)}，使用原始内容")
+                print(f"[ERROR] 新闻 {i} FireCrawl获取出错: {str(e)}，使用原始内容 (长度: {len(fallback_content)})")
 
         print(f"[INFO] FireCrawl处理完成，{len(processed_news)}/{len(news_list)} 条新闻处理完成")
         return processed_news
@@ -332,45 +357,55 @@ class NewsProcessor:
                 )
                 
                 if optimized_result and isinstance(optimized_result, dict):
-                    # 确保包含必要字段
-                    webhook_data = {
-                        "message_type": optimized_result.get("message_type", "text"),
-                        "title": optimized_result.get("title", news_item.get('title', '')),
-                        "content": optimized_result.get("content", raw_content),
-                        "original_link": optimized_result.get("original_link", original_link),
-                        "ai_score": news_item.get('ai_score', 0.0)  # 保留AI评分
-                    }
-                    processed_news.append(webhook_data)
-                    print(f"[INFO] 新闻 {i} AI优化成功")
+                    # 检查是否是AI标记的无效数据
+                    if optimized_result.get("invalid_data", False):
+                        print(f"[WARN] 新闻 {i} 被AI判定为无效数据，丢弃该新闻")
+                        continue
+
+                    # 验证AI优化结果的内容
+                    opt_title = optimized_result.get("title", "").strip()
+                    opt_content = optimized_result.get("content", "").strip()
+
+                    if opt_title and opt_content:
+                        # AI优化成功且内容完整
+                        webhook_data = {
+                            "message_type": optimized_result.get("message_type", "text"),
+                            "title": opt_title,
+                            "content": opt_content,
+                            "original_link": optimized_result.get("original_link", original_link),
+                            "ai_score": news_item.get('ai_score', 0.0)
+                        }
+                        processed_news.append(webhook_data)
+                        print(f"[INFO] 新闻 {i} AI优化成功")
+                    else:
+                        # AI优化返回了结果但内容为空，直接丢弃新闻
+                        print(f"[WARN] 新闻 {i} AI优化返回空内容，丢弃该新闻")
+                        continue
                 elif optimized_result is None:
-                    # AI优化完全失败，丢弃新闻
-                    print(f"[ERROR] 新闻 {i} AI优化完全失败（豆包和Gemini都失败），丢弃该新闻")
+                    # AI优化完全失败，直接丢弃新闻
+                    print(f"[WARN] 新闻 {i} AI优化完全失败，丢弃该新闻")
                     continue
                 else:
-                    # AI优化失败，使用原始内容
-                    print(f"[WARN] 新闻 {i} AI优化失败，使用原始内容")
-                    webhook_data = {
-                        "message_type": "text",
-                        "title": news_item.get('title', ''),
-                        "content": raw_content,
-                        "original_link": original_link,
-                        "ai_score": news_item.get('ai_score', 0.0)
-                    }
-                    processed_news.append(webhook_data)
-                    
+                    # AI优化返回了非字典结果，直接丢弃新闻
+                    print(f"[WARN] 新闻 {i} AI优化返回异常结果，丢弃该新闻")
+                    continue
+
             except Exception as e:
                 print(f"[ERROR] 新闻 {i} 处理出错: {str(e)}")
                 continue
         
         return processed_news
-    
+
+
     def get_processing_stats(self) -> Dict[str, Any]:
         """获取处理统计信息"""
         return {
             'ai_analyzer_ready': bool(self.ai_analyzer),
             'gemini_enabled': bool(self.config.get('gemini_api_keys')),
             'openrouter_enabled': bool(self.config.get('openrouter_api_keys')),
+            'content_extraction_enabled': self.config.get('content_extraction', {}).get('enabled', True),
             'firecrawl_enabled': bool(self.config.get('firecrawl_api_key')),
+            'zyte_enabled': bool(self.config.get('zyte_api_key')),
             'min_relevance_score': self.config.get('ai_settings', {}).get('min_relevance_score', 6)
         }
 

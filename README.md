@@ -90,11 +90,32 @@ python main.py run
 
 | Configuration | Description | Default |
 |---------------|-------------|---------|
+| `content_extraction.enabled` | Enable/Disable Content Crawling | true |
 | `mediastack.api_key` | MediaStack API Key | Optional |
 | `newsapi.api_key` | News API Key | Optional |
 | `min_relevance_score` | Minimum Relevance Score | 8.0 |
 | `max_send_limit` | Maximum Push Count | 10 |
 | `time_window_hours` | News Time Window (hours) | 24 |
+
+### Content Extraction Options
+
+**Enabled (Default):**
+```yaml
+content_extraction:
+  enabled: true
+```
+- Uses FireCrawl + Zyte to fetch complete article content
+- Provides richer, more detailed news content
+- Requires FireCrawl API key
+
+**Disabled (Cost-Saving Mode):**
+```yaml
+content_extraction:
+  enabled: false
+```
+- Uses RSS original content only
+- Faster processing, saves API costs
+- No FireCrawl/Zyte API calls needed
 
 ### API Key Acquisition
 
@@ -189,6 +210,40 @@ dailyinfo/
     └── zyte_client.py        # Zyte Client
 ```
 
+## 🔄 Auto-Start on Server Reboot
+
+### Quick Setup (Linux Servers)
+
+**One-Command Installation:**
+```bash
+# Install as system service with auto-start on boot
+./install_service.sh
+```
+
+This will:
+- ✅ Install DailyInfo as a systemd service
+- ✅ Enable automatic startup on server reboot
+- ✅ Configure proper logging and error handling
+- ✅ Set up service management commands
+
+**Benefits:**
+- **Reliability**: Service automatically restarts if it crashes
+- **Boot Integration**: Starts automatically when server reboots
+- **System Integration**: Full integration with Linux service management
+- **Logging**: Centralized logging through systemd journal
+
+**Service Management:**
+```bash
+sudo systemctl status dailyinfo   # Check status
+sudo systemctl restart dailyinfo  # Restart service
+sudo journalctl -u dailyinfo -f   # View real-time logs
+```
+
+**Uninstall:**
+```bash
+./uninstall_service.sh
+```
+
 ## 🚀 Production Deployment
 
 ### Method 1: Integrated Commands (Recommended)
@@ -197,21 +252,40 @@ dailyinfo/
 # Start background service
 python main.py start
 
+# Run once immediately then start background service
+python main.py run-schedule
+
 # Check service status
-python main.py daemon status
+python main.py status
 
 # Stop service
 python main.py stop
 
 # Restart service
-python main.py daemon restart
+python main.py restart
 
 # View real-time logs
 tail -f logs/daemon.log
 ```
 
-### Method 2: Systemd Service (Linux Servers)
+### Method 2: Systemd Service (Linux Servers) - Auto-start on Boot
 
+**Automatic Installation (Recommended):**
+```bash
+# Install as system service with auto-start on boot
+./install_service.sh
+
+# Check service status
+sudo systemctl status dailyinfo
+
+# View logs
+sudo journalctl -u dailyinfo -f
+
+# Uninstall service
+./uninstall_service.sh
+```
+
+**Manual Installation:**
 ```bash
 # 1. Edit service file
 sudo cp dailyinfo.service /etc/systemd/system/
@@ -230,6 +304,16 @@ sudo systemctl status dailyinfo
 sudo journalctl -u dailyinfo -f
 ```
 
+**Service Management:**
+```bash
+sudo systemctl start dailyinfo    # Start service
+sudo systemctl stop dailyinfo     # Stop service
+sudo systemctl restart dailyinfo  # Restart service
+sudo systemctl status dailyinfo   # Check status
+sudo systemctl enable dailyinfo   # Enable auto-start
+sudo systemctl disable dailyinfo  # Disable auto-start
+```
+
 ### Method 3: Screen/Tmux
 
 ```bash
@@ -246,7 +330,7 @@ tmux new-session -d -s dailyinfo 'python main.py schedule'
 tmux attach-session -t dailyinfo
 
 # Alternative: Use built-in daemon mode
-python main.py schedule --daemon
+python main.py start
 ```
 
 ### Monitoring and Debugging
@@ -258,8 +342,11 @@ python main.py status
 # Run immediate test
 python main.py run
 
+# Run once then start background service
+python main.py run-schedule
+
 # View running logs
-tail -f logs/dailyinfo_*.log
+tail -f logs/daemon.log
 
 # View sent messages
 cat logs/sent_messages.json

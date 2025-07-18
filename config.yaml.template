@@ -34,6 +34,9 @@ openrouter_model: "deepseek/deepseek-r1-0528:free"
 openrouter_enable_search: false  # Whether to enable internet search
 
 # Content extraction services
+content_extraction:
+  enabled: true                      # Master switch for content extraction (FireCrawl + Zyte)
+
 firecrawl_api_key: "YOUR_FIRECRAWL_API_KEY_HERE"
 zyte_api_key: "YOUR_ZYTE_API_KEY_HERE"
 
@@ -121,7 +124,14 @@ ai_settings:
       识别条件: 如果"待处理数据包"满足以下任一条件，则判定为无效数据：
       数据完全为空 (null, "")。
       数据内容明确为爬虫抓取失败的标志，例如（不限于）："404 Not Found", "Error 403 Forbidden", "Access Denied", "找不到服务器", "请求超时"。
-      处理方式: 一旦判定为无效数据，必须立即中止所有后续步骤，并丢弃该数据包。不得输出任何内容。
+      处理方式: 一旦判定为无效数据，必须立即中止所有后续步骤，并返回以下JSON格式的无效数据标记：
+      {{
+        "message_type": "text",
+        "title": "",
+        "content": "",
+        "original_link": "{original_link}",
+        "invalid_data": true
+      }}
 
       2. 核心工作流 (Core Workflow)
       如果数据有效，则严格按照以下流程处理：

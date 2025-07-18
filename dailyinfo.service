@@ -1,7 +1,9 @@
 [Unit]
 Description=DailyInfo - AI-powered intelligent news monitoring system
-After=network.target
-Wants=network.target
+Documentation=https://github.com/haoyiyin/dailyinfo
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -10,23 +12,35 @@ Group=your_group
 WorkingDirectory=/path/to/DailyInfo
 Environment=PATH=/usr/bin:/usr/local/bin
 Environment=PYTHONPATH=/path/to/DailyInfo
-ExecStart=/usr/bin/python3 /path/to/DailyInfo/main.py schedule
+Environment=PYTHONUNBUFFERED=1
+
+# 启动命令 - 使用start命令启动后台定时任务
+ExecStart=/usr/bin/python3 /path/to/DailyInfo/main.py start
+ExecStop=/usr/bin/python3 /path/to/DailyInfo/main.py stop
 ExecReload=/bin/kill -HUP $MAINPID
-KillMode=mixed
+
+# 重启策略
 Restart=always
 RestartSec=10
+StartLimitBurst=5
+
+# 输出设置
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=dailyinfo
 
 # 资源限制
 LimitNOFILE=65536
 MemoryMax=1G
+TimeoutStartSec=60
+TimeoutStopSec=30
 
 # 安全设置
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ReadWritePaths=/path/to/DailyInfo/logs
+ReadWritePaths=/path/to/DailyInfo
 
 [Install]
 WantedBy=multi-user.target

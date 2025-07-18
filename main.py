@@ -70,12 +70,14 @@ def start_daemon_service(config: dict):
     print("[INFO] 启动 DailyInfo 后台服务...")
 
     # 启动后台进程
+    main_script = os.path.abspath(__file__)
     with open(log_file, 'a') as log:
         process = subprocess.Popen(
-            [sys.executable, __file__, "schedule"],
+            [sys.executable, main_script, "schedule"],
             stdout=log,
             stderr=log,
-            cwd=script_dir
+            cwd=script_dir,
+            preexec_fn=os.setsid if hasattr(os, 'setsid') else None  # 创建新的进程组
         )
 
     # 保存PID
@@ -83,18 +85,126 @@ def start_daemon_service(config: dict):
         f.write(str(process.pid))
 
     # 等待一下确保进程启动
-    time.sleep(2)
+    time.sleep(3)
 
     try:
         os.kill(process.pid, 0)  # 检查进程是否还在运行
         print(f"[INFO] DailyInfo 后台服务启动成功 (PID: {process.pid})")
         print(f"[INFO] 日志文件: {log_file}")
         print(f"[INFO] 查看日志: tail -f {log_file}")
-        print(f"[INFO] 停止服务: python {__file__} stop")
+        print(f"[INFO] 停止服务: python {main_script} stop")
+
+        # 显示最近的日志以确认启动状态
+        if os.path.exists(log_file):
+            print("\n[INFO] 启动日志:")
+            try:
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                    for line in lines[-3:]:
+                        if line.strip():
+                            print(f"  {line.rstrip()}")
+            except Exception as e:
+                print(f"  无法读取日志文件: {e}")
+
     except OSError:
         print("[ERROR] DailyInfo 后台服务启动失败")
         if os.path.exists(pid_file):
             os.remove(pid_file)
+
+        # 显示错误日志
+        if os.path.exists(log_file):
+            print("\n[ERROR] 错误日志:")
+            try:
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                    for line in lines[-5:]:
+                        if line.strip():
+                            print(f"  {line.rstrip()}")
+            except Exception as e:
+                print(f"  无法读取日志文件: {e}")
+
+
+def start_daemon_service_with_immediate_run(config: dict):
+    """启动后台守护进程，并在启动后立即执行一次任务"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    pid_file = os.path.join(script_dir, "dailyinfo.pid")
+    log_file = os.path.join(script_dir, "logs", "daemon.log")
+
+    # 确保日志目录存在
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+    # 检查是否已经在运行
+    if os.path.exists(pid_file):
+        with open(pid_file, 'r') as f:
+            pid = int(f.read().strip())
+
+        try:
+            os.kill(pid, 0)  # 检查进程是否存在
+            print(f"[INFO] DailyInfo 已在后台运行 (PID: {pid})")
+            print(f"[INFO] 日志文件: {log_file}")
+            print(f"[INFO] 查看日志: tail -f {log_file}")
+            print(f"[INFO] 停止服务: python {os.path.abspath(__file__)} stop")
+            return
+        except OSError:
+            # 进程不存在，删除过期的PID文件
+            os.remove(pid_file)
+
+    print("[INFO] 启动 DailyInfo 后台服务（立即执行模式）...")
+
+    # 启动后台进程，使用特殊参数表示立即执行
+    main_script = os.path.abspath(__file__)
+    with open(log_file, 'a') as log:
+        process = subprocess.Popen(
+            [sys.executable, main_script, "_daemon_with_immediate_run"],
+            stdout=log,
+            stderr=log,
+            cwd=script_dir,
+            preexec_fn=os.setsid if hasattr(os, 'setsid') else None  # 创建新的进程组
+        )
+
+    # 保存PID
+    with open(pid_file, 'w') as f:
+        f.write(str(process.pid))
+
+    # 等待一下确保进程启动
+    time.sleep(3)
+
+    try:
+        os.kill(process.pid, 0)  # 检查进程是否还在运行
+        print(f"[INFO] DailyInfo 后台服务启动成功 (PID: {process.pid})")
+        print(f"[INFO] 服务将立即执行一次任务，然后开始定时任务")
+        print(f"[INFO] 日志文件: {log_file}")
+        print(f"[INFO] 查看日志: tail -f {log_file}")
+        print(f"[INFO] 停止服务: python {main_script} stop")
+
+        # 显示最近的日志以确认启动状态
+        if os.path.exists(log_file):
+            print("\n[INFO] 启动日志:")
+            try:
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                    for line in lines[-3:]:
+                        if line.strip():
+                            print(f"  {line.rstrip()}")
+            except Exception as e:
+                print(f"  无法读取日志文件: {e}")
+
+    except OSError:
+        print("[ERROR] DailyInfo 后台服务启动失败")
+        if os.path.exists(pid_file):
+            os.remove(pid_file)
+
+        # 显示错误日志
+        if os.path.exists(log_file):
+            print("\n[ERROR] 错误日志:")
+            try:
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                    for line in lines[-5:]:
+                        if line.strip():
+                            print(f"  {line.rstrip()}")
+            except Exception as e:
+                print(f"  无法读取日志文件: {e}")
 
 
 def stop_daemon_service():
@@ -172,46 +282,45 @@ def show_daemon_status():
         print("[INFO] DailyInfo 后台服务未运行")
 
 
-def start_scheduled_tasks(workflow_manager: WorkflowManager, config: dict):
-    """启动定时任务"""
+def start_scheduled_daemon(workflow_manager: WorkflowManager, config: dict):
+    """启动后台定时任务"""
     from utils.scheduler import scheduler_manager
-    
+
     daily_run_time = config.get('daily_run_time', '06:00')
     timezone = config.get('timezone', 'Asia/Shanghai')
-    
+
     print(f"[INFO] 配置定时任务: 每天 {daily_run_time} ({timezone})")
-    
+
     try:
         # 初始化调度器
         config_manager = ConfigManager()
         scheduler = scheduler_manager.initialize(config_manager)
-        
+
         # 定义任务函数
         def daily_task():
             execute_task(workflow_manager)
-        
+
         # 启动调度器
         scheduler.start_scheduler(daily_task)
-        
+
         # 显示调度器状态
         status = scheduler.get_status()
         print(f"[INFO] 定时任务已设置，等待执行...")
         print(f"[INFO] 下次执行时间: {status.get('next_run_time', 'N/A')}")
-        print("[INFO] 按 Ctrl+C 退出程序")
-        
+
         # 设置信号处理
         def signal_handler(signum, frame):
             print("\n[INFO] 收到退出信号，正在停止定时任务...")
             scheduler_manager.cleanup()
             sys.exit(0)
-        
+
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
-        
+
         # 保持程序运行
         while True:
             time.sleep(60)
-            
+
     except Exception as e:
         print(f"[ERROR] 定时任务启动失败: {str(e)}")
         scheduler_manager.cleanup()
@@ -247,7 +356,21 @@ def show_status(config_manager: ConfigManager):
     print(f"  RSS源: 启用 (每源文章数: {rss_config.get('max_articles_per_feed', 10)})")
     print(f"  MediaStack: {'启用' if news_sources.get('mediastack', {}).get('enabled') else '禁用'}")
     print(f"  News API: {'启用' if news_sources.get('newsapi', {}).get('enabled') else '禁用'}")
-    
+
+    # 内容抓取配置
+    content_extraction_enabled = config.get('content_extraction', {}).get('enabled', True)
+    firecrawl_key = config.get('firecrawl_api_key', '')
+    zyte_key = config.get('zyte_api_key', '')
+
+    print(f"\n内容抓取配置:")
+    print(f"  内容抓取: {'启用' if content_extraction_enabled else '禁用'}")
+    if content_extraction_enabled:
+        print(f"  FireCrawl: {'已配置' if firecrawl_key and not firecrawl_key.startswith('YOUR_') else '未配置'}")
+        print(f"  Zyte: {'已配置' if zyte_key and not zyte_key.startswith('YOUR_') else '未配置'}")
+    else:
+        print(f"  FireCrawl: 已禁用")
+        print(f"  Zyte: 已禁用")
+
     # 推送配置
     webhook_url = config.get('webhook_url', '')
     if webhook_url:
@@ -269,29 +392,27 @@ def show_help():
     print()
     print("命令:")
     print("  run                    - 立即执行一次新闻处理任务")
-    print("  schedule               - 启动定时任务模式（前台运行）")
-    print("  schedule --daemon      - 启动定时任务模式（后台运行）")
-    print("  start                  - 启动后台服务（快捷命令）")
-    print("  stop                   - 停止后台服务（快捷命令）")
-    print("  daemon start           - 启动后台服务")
-    print("  daemon stop            - 停止后台服务")
-    print("  daemon status          - 查看后台服务状态")
-    print("  daemon restart         - 重启后台服务")
+    print("  start                  - 启动后台定时任务")
+    print("  stop                   - 停止后台服务")
+    print("  restart                - 重启后台服务")
+    print("  run-schedule           - 启动后台定时任务并立即执行一次")
     print("  status                 - 显示系统配置和服务状态")
     print("  help                   - 显示此帮助信息")
     print()
     print("示例:")
     print("  python main.py run                # 立即执行一次")
-    print("  python main.py schedule           # 前台定时任务")
-    print("  python main.py schedule --daemon  # 后台定时任务")
-    print("  python main.py start              # 启动后台服务")
+    print("  python main.py start              # 启动后台定时任务")
+    print("  python main.py run-schedule       # 后台启动并立即执行一次")
     print("  python main.py stop               # 停止后台服务")
+    print("  python main.py restart            # 重启后台服务")
     print("  python main.py status             # 查看状态")
     print()
     print("后台服务管理:")
     print("  启动: python main.py start")
+    print("  立即启动: python main.py run-schedule")
     print("  停止: python main.py stop")
-    print("  状态: python main.py daemon status")
+    print("  重启: python main.py restart")
+    print("  状态: python main.py status")
     print("  日志: tail -f logs/daemon.log")
 
 
@@ -312,51 +433,44 @@ def main():
             print("[INFO] 立即执行模式")
             execute_task(workflow_manager)
             
-        elif command == "schedule":
-            # 检查是否有 --daemon 参数
-            daemon_mode = len(sys.argv) > 2 and sys.argv[2] == "--daemon"
-
-            if daemon_mode:
-                start_daemon_service(config)
-            else:
-                print("[INFO] 定时任务模式")
-                start_scheduled_tasks(workflow_manager, config)
-
-        elif command == "daemon":
-            # 后台服务管理命令
-            if len(sys.argv) > 2:
-                daemon_cmd = sys.argv[2]
-                if daemon_cmd == "start":
-                    start_daemon_service(config)
-                elif daemon_cmd == "stop":
-                    stop_daemon_service()
-                elif daemon_cmd == "status":
-                    show_daemon_status()
-                elif daemon_cmd == "restart":
-                    stop_daemon_service()
-                    time.sleep(2)
-                    start_daemon_service(config)
-                else:
-                    print(f"[ERROR] 未知的daemon命令: {daemon_cmd}")
-                    print("可用命令: start, stop, status, restart")
-                    sys.exit(1)
-            else:
-                print("[ERROR] daemon命令需要子命令")
-                print("使用方法: python main.py daemon {start|stop|status|restart}")
-                sys.exit(1)
-
         elif command == "start":
-            # 启动后台服务的快捷命令
+            # 启动后台定时任务
             start_daemon_service(config)
 
         elif command == "stop":
-            # 停止后台服务的快捷命令
+            # 停止后台服务
             stop_daemon_service()
+
+        elif command == "restart":
+            # 重启后台服务
+            stop_daemon_service()
+            time.sleep(2)
+            start_daemon_service(config)
+
+        elif command == "run-schedule":
+            # 启动后台服务，并在启动后立即执行一次任务
+            print("[INFO] 启动后台定时任务，并立即执行一次...")
+            start_daemon_service_with_immediate_run(config)
 
         elif command == "status":
             show_status(config_manager)
             print("\n" + "="*50)
             show_daemon_status()
+
+        elif command == "_daemon_with_immediate_run":
+            # 特殊的后台模式：立即执行一次后启动定时任务
+            print("[INFO] 后台服务启动，立即执行一次任务...")
+
+            # 立即执行一次任务
+            try:
+                execute_task(workflow_manager)
+                print("[INFO] 立即执行完成，开始定时任务...")
+            except Exception as e:
+                print(f"[ERROR] 立即执行失败: {e}")
+                print("[INFO] 继续启动定时任务...")
+
+            # 启动定时任务
+            start_scheduled_daemon(workflow_manager, config)
 
         elif command == "help" or command == "--help" or command == "-h":
             show_help()
